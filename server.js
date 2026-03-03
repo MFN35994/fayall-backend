@@ -3,13 +3,29 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const admin = require('firebase-admin'); // NOUVEAU : Firebase Admin
+const admin = require('firebase-admin');
 
-// NOUVEAU : Initialisation de Firebase
-const serviceAccount = require('./firebase-key.json');
+// --- INITIALISATION FIREBASE ---
+let serviceAccount;
+const secretFilePath = '/etc/secrets/firebase-key.json'; // Chemin Render standard
+
+if (fs.existsSync(secretFilePath)) {
+    // Si on est sur Render
+    serviceAccount = require(secretFilePath);
+    console.log("✅ Chargement de la clé Firebase depuis /etc/secrets/");
+} else if (fs.existsSync('./firebase-key.json')) {
+    // Si on est en local
+    serviceAccount = require('./firebase-key.json');
+    console.log("✅ Chargement de la clé Firebase locale");
+} else {
+    console.error("❌ ERREUR : Impossible de trouver firebase-key.json !");
+    process.exit(1);
+}
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
+// -------------------------------
 const db = admin.firestore();
 
 const app = express();
