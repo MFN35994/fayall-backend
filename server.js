@@ -33,12 +33,21 @@ const app = express();
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
-app.use(express.json());
+// --- CONFIGURATION CORS (Permissive pour éviter les blocages) ---
 app.use(cors({
-  origin: '*', 
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Bypass-Tunnel-Reminder', 'Authorization']
+  origin: true, // Autorise toutes les origines (fayall.web.app, localhost, etc.)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Bypass-Tunnel-Reminder'],
+  credentials: true
 }));
+
+// Middleware pour forcer les headers CORS sur chaque réponse (Sécurité supplémentaire)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*"); // Ou req.headers.origin si credentials=true
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Bypass-Tunnel-Reminder");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  next();
+});
 
 app.use('/uploads', express.static('uploads'));
 
@@ -289,7 +298,7 @@ app.post('/api/paydunya/init', async (req, res) => {
                 return_url: "https://ais-dev-42ldjjdamaj4dayu53yxkx-101404280096.europe-west2.run.app/transfer",
                 // C'est ICI que PayDunya envoie la confirmation invisible en arrière-plan
                 // REMPLACE L'ANCIENNE URL PAR LA NOUVELLE :
-                callback_url: "https://lulmz-2001-4278-1f-5837-243f-c5f2-7f9f-f579.a.free.pinggy.link/api/paydunya/ipn"
+                callback_url: "https://fayall-backend.onrender.com/api/paydunya/ipn"
             }
         }, {
             headers: {
