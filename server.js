@@ -33,21 +33,14 @@ const app = express();
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
-// --- CONFIGURATION CORS (Permissive pour éviter les blocages) ---
+// --- CONFIGURATION CORS (Version Simple et Robuste) ---
 app.use(cors({
-  origin: true, // Autorise toutes les origines (fayall.web.app, localhost, etc.)
+  origin: '*', // Autorise toutes les origines sans restriction
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Bypass-Tunnel-Reminder'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'Bypass-Tunnel-Reminder']
 }));
 
-// Middleware pour forcer les headers CORS sur chaque réponse (Sécurité supplémentaire)
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*"); // Ou req.headers.origin si credentials=true
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Bypass-Tunnel-Reminder");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  next();
-});
+// (Supprime l'autre app.use avec res.header s'il est encore là, il fait doublon !)
 
 app.use('/uploads', express.static('uploads'));
 
