@@ -30,6 +30,11 @@ const db = admin.firestore();
 
 const app = express();
 
+// --- MIDDLEWARES INDISPENSABLES ---
+app.use(express.json()); // Permet de lire le JSON envoyé par React
+app.use(express.urlencoded({ extended: true }));
+// ----------------------------------
+
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
