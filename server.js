@@ -31,16 +31,17 @@ const db = admin.firestore();
 const app = express();
 
 // --- MIDDLEWARES INDISPENSABLES ---
-app.use(express.json()); // Permet de lire le JSON envoyé par React
+app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 // ----------------------------------
 
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
-// --- CONFIGURATION CORS (Version Simple et Robuste) ---
+
+// --- CONFIGURATION CORS ---
 app.use(cors({
-  origin: '*', // Autorise toutes les origines sans restriction
+  origin: '*', 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Bypass-Tunnel-Reminder']
 }));
@@ -67,14 +68,9 @@ app.post('/upload-kyc', upload.fields([
   console.log("ID Utilisateur :", req.body.userId);
   
   if (!req.files || Object.keys(req.files).length === 0) {
-      console.log("❌ AUCUN FICHIER REÇU ! Multer n'a rien trouvé.");
+      console.log("❌ AUCUN FICHIER REÇU !");
       return res.status(400).send('Aucun fichier reçu');
   }
-
-  console.log("✅ Fichiers reçus :");
-  if (req.files['recto']) console.log("- Recto sauvegardé");
-  if (req.files['verso']) console.log("- Verso sauvegardé");
-  if (req.files['selfie']) console.log("- Selfie sauvegardé");
   
   res.status(200).send('OK');
 });
@@ -82,17 +78,17 @@ app.post('/upload-kyc', upload.fields([
 // Route pour valider un utilisateur dans Firebase
 app.post('/valider-kyc/:userId', async (req, res) => {
     const userId = req.params.userId;
-    console.log(`⏳ Début de la validation pour l'utilisateur : ${userId}`);
+    console.log(`⏳ Début de la validation pour : ${userId}`);
     
     try {
         await db.collection('users').doc(userId).update({
             kyc_status: 'VERIFIED',
             cni_number: 'SN-' + Math.floor(Math.random() * 1000000000)
         });
-        console.log(`✅ Utilisateur ${userId} validé avec succès dans Firebase !`);
+        console.log(`✅ Utilisateur ${userId} validé !`);
         res.status(200).send("Utilisateur validé !");
     } catch (error) {
-        console.error("❌ Erreur CRITIQUE lors de la validation Firebase :", error);
+        console.error("❌ Erreur validation Firebase :", error);
         res.status(500).send("Erreur lors de la validation");
     }
 });
@@ -117,14 +113,15 @@ app.get('/admin', (req, res) => {
             <script>
                 function validerUser(userId, btn) {
                     if (userId === 'inconnu') {
-                        userId = prompt("Veuillez entrer l'ID Firebase de l'utilisateur à valider (ex: beqrs2xdCTZaKJMc516ZMYv30ij1) :");
+                        userId = prompt("ID Firebase de l'utilisateur :");
                         if (!userId) return;
                     }
                     btn.innerText = "Validation en cours...";
-                    fetch('http://localhost:3000/valider-kyc/' + userId, { method: 'POST' })
+                    // FIX : Utilisation du chemin relatif pour Render
+                    fetch('/valider-kyc/' + userId, { method: 'POST' })
                     .then(response => {
                         if(response.ok) {
-                            btn.innerText = "✅ VALIDÉ (" + userId + ")";
+                            btn.innerText = "✅ VALIDÉ";
                             btn.style.background = "#1a73e8";
                             btn.disabled = true;
                         } else {
@@ -152,7 +149,7 @@ app.get('/admin', (req, res) => {
 
         const userIds = Object.keys(users);
         if (userIds.length === 0) {
-            html += "<p>Aucun document reçu. Le dossier uploads est vide.</p>";
+            html += "<p>Aucun document reçu.</p>";
         } else {
             userIds.forEach(userId => {
                 html += `<div class="card">
@@ -182,10 +179,9 @@ const PDFDocument = require('pdfkit');
 
 app.post('/pay-merchant', async (req, res) => {
     console.log("--- 🛒 NOUVEAU PAIEMENT MARCHAND ---");
-    const { userId, merchantId, amount, sourceAccount, transactionId } = req.body;
+    // On récupère sourceProvider envoyé par le nouveau frontend
+    const { userId, merchantId, amount, sourceAccount, sourceProvider, transactionId } = req.body;
     
-    console.log(`💸 Paiement de ${amount} XOF vers le marchand [${merchantId}] par l'utilisateur [${userId}]`);
-
     try {
         const receiptsDir = path.join(__dirname, 'receipts');
         if (!fs.existsSync(receiptsDir)) {
@@ -214,7 +210,8 @@ app.post('/pay-merchant', async (req, res) => {
 
         doc.font('Helvetica-Bold').text('Détails du Client :');
         doc.font('Helvetica').text(`ID Client : ${userId}`);
-        doc.text(`Source du paiement : ${sourceAccount}`);
+        // FIX : On affiche le nom du prestataire (WAVE, Orange Money, etc.)
+        doc.text(`Source du paiement : ${sourceProvider || sourceAccount}`);
         doc.moveDown(2);
 
         doc.rect(50, doc.y, 500, 50).fillAndStroke('#f8f9fa', '#dddddd');
@@ -223,12 +220,12 @@ app.post('/pay-merchant', async (req, res) => {
         doc.end();
 
         stream.on('finish', async () => {
-            console.log(`✅ Reçu PDF généré avec succès : ${filePath}`);
-            res.status(200).json({ success: true, message: "Paiement validé et reçu généré", receipt: fileName });
+            console.log(`✅ Reçu PDF généré : ${filePath}`);
+            res.status(200).json({ success: true, message: "Paiement validé", receipt: fileName });
         });
 
     } catch (error) {
-        console.error("❌ Erreur lors du paiement marchand :", error);
+        console.error("❌ Erreur paiement marchand :", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -240,23 +237,13 @@ const PAYDUNYA_MASTER_KEY = "EPUBEiOL-tK7m-sBbA-ftjg-mQen7xyw2ETp";
 const PAYDUNYA_PRIVATE_KEY = "test_private_xZdMAGac4jWL85gCERLpfQQBsYz";
 const PAYDUNYA_TOKEN = "8dG2vdIXN3k6qvONtgK7";
 
-// 1. Route pour INITIER un paiement
 app.post('/api/paydunya/init', async (req, res) => {
     try {
         const { amount, description } = req.body;
-
         const response = await axios.post('https://app.paydunya.com/api/v1/checkout-invoice/create', {
-            invoice: {
-                total_amount: amount,
-                description: description || "Paiement FAYALL"
-            },
-            store: {
-                name: "FAYALL App"
-            },
-            custom_data: {
-                userId: req.body.userId,
-                transactionId: req.body.transactionId
-            },
+            invoice: { total_amount: amount, description: description || "Paiement FAYALL" },
+            store: { name: "FAYALL App" },
+            custom_data: { userId: req.body.userId, transactionId: req.body.transactionId },
             actions: {
                 cancel_url: "https://ais-dev-42ldjjdamaj4dayu53yxkx-101404280096.europe-west2.run.app/transfer",
                 return_url: "https://ais-dev-42ldjjdamaj4dayu53yxkx-101404280096.europe-west2.run.app/transfer",
@@ -270,93 +257,49 @@ app.post('/api/paydunya/init', async (req, res) => {
                 'Content-Type': 'application/json'
             }
         });
-
-        res.json({
-            success: true,
-            paymentUrl: response.data.response_text,
-            token: response.data.token
-        });
-
+        res.json({ success: true, paymentUrl: response.data.response_text, token: response.data.token });
     } catch (error) {
-        console.error("Erreur PayDunya Init:", error.response ? error.response.data : error.message);
-        res.status(500).json({ success: false, error: "Erreur lors de l'initialisation du paiement" });
+        res.status(500).json({ success: false, error: "Erreur PayDunya" });
     }
 });
 
-// 2. Route IPN (Callback) : C'EST ICI QUE LA MAGIE OPÈRE !
 app.post('/api/paydunya/ipn', async (req, res) => {
     console.log("🔔 IPN PayDunya Reçu !");
-    
     try {
         const data = req.body.data;
-        if (!data || !data.status) {
-            return res.status(400).send("Données invalides");
-        }
+        if (!data || data.status !== "completed") return res.status(200).send("Ignoré");
 
-        const status = data.status;
-        const customData = data.custom_data;
-        const invoice = data.invoice;
+        const { userId, transactionId } = data.custom_data;
+        const amount = parseFloat(data.invoice.total_amount);
 
-        if (status === "completed") {
-            const userId = customData.userId;
-            const transactionId = customData.transactionId;
-            const amount = parseFloat(invoice.total_amount);
+        const txnRef = db.collection('transactions').doc(transactionId); 
+        const txnDoc = await txnRef.get();
+        if (txnDoc.exists) return res.status(200).send("Déjà traité");
 
-            console.log(`✅ Paiement RÉUSSI pour la transaction ${transactionId}`);
-            console.log(`💰 Montant : ${amount}, Utilisateur : ${userId}`);
+        const batch = db.batch();
+        const userRef = db.collection('users').doc(userId);
+        batch.update(userRef, { balance: admin.firestore.FieldValue.increment(amount) });
+        batch.set(txnRef, {
+            user_id: userId,
+            type: 'DEPOSIT',
+            amount: amount,
+            currency: 'XOF',
+            status: 'SUCCESS',
+            source_provider: 'PAYDUNYA',
+            source_account: 'MOBILE_MONEY',
+            description: "Rechargement via PayDunya",
+            reference: transactionId,
+            created_at: new Date().toISOString(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
 
-            // --- MISE À JOUR FIREBASE ---
-            
-            // 1. Vérifier si la transaction a déjà été traitée (Idempotence)
-            const txnRef = db.collection('transactions').doc(transactionId); 
-            const txnDoc = await txnRef.get();
-
-            if (txnDoc.exists) {
-                console.log("⚠️ Transaction déjà traitée. On ignore.");
-                return res.status(200).send("Déjà traité");
-            }
-
-            // 2. Exécuter la mise à jour (Batch pour atomicité)
-            const batch = db.batch();
-
-            // A. Créditer le solde de l'utilisateur
-            const userRef = db.collection('users').doc(userId);
-            batch.update(userRef, {
-                balance: admin.firestore.FieldValue.increment(amount)
-            });
-
-            // B. Enregistrer la transaction
-            batch.set(txnRef, {
-                user_id: userId,
-                type: 'DEPOSIT', // Dépôt via PayDunya
-                amount: amount,
-                currency: 'XOF',
-                status: 'SUCCESS',
-                source_provider: 'PAYDUNYA',
-                source_account: 'MOBILE_MONEY',
-                description: "Rechargement via PayDunya",
-                reference: transactionId,
-                paydunya_token: data.token,
-                created_at: new Date().toISOString(),
-                timestamp: admin.firestore.FieldValue.serverTimestamp()
-            });
-
-            await batch.commit();
-            console.log("🎉 Firebase mis à jour avec succès ! Solde crédité.");
-
-        } else {
-            console.log(`❌ Paiement ÉCHOUÉ ou ANNULÉ pour la transaction ${customData.transactionId}`);
-        }
-
+        await batch.commit();
         res.status(200).send("OK");
-
     } catch (error) {
-        console.error("❌ Erreur lors du traitement IPN :", error);
         res.status(500).send("Erreur interne");
     }
 });
 
 app.listen(process.env.PORT || 3000, () => {
-  console.log('✅ Serveur FAYALL démarré sur le port 3000');
-  console.log('📁 Galerie Admin disponible sur : http://localhost:3000/admin');
+  console.log('✅ Serveur FAYALL démarré');
 });
